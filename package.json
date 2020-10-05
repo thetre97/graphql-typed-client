@@ -1,7 +1,7 @@
 {
-  "name": "graphql-typed-client",
+  "name": "graphql-typed-client-minimal",
   "description": "A tool that generates a strongly typed client library for any GraphQL endpoint. The client allows writing GraphQL queries as plain JS objects (with type safety, awesome code completion experience, custom scalar type mapping, type guards and more)",
-  "version": "1.7.4",
+  "version": "1.8.0",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "repository": "git@github.com:helios1138/graphql-typed-client.git",
