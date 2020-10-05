@@ -1,7 +1,7 @@
 import 'isomorphic-fetch'
 import { buildClientSchema, ExecutionResult, getIntrospectionQuery, IntrospectionQuery } from 'graphql'
 import { GraphQLSchemaValidationOptions } from 'graphql/type/schema'
-import qs from 'qs'
+import qs from 'querystring'
 
 export interface SchemaFetcher {
   (query: string, fetchImpl: typeof fetch, qsImpl: typeof qs): Promise<ExecutionResult<IntrospectionQuery>>

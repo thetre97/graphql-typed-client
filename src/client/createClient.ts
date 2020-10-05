@@ -1,14 +1,11 @@
 import 'isomorphic-fetch'
-import qs from 'qs'
+import qs from 'querystring'
 import { ExecutionResult, GraphQLError } from 'graphql'
-import { NEVER, Observable } from 'rxjs'
-import { get } from 'lodash'
-import { map } from 'rxjs/operators'
+import get from 'lodash.get'
 import { applyTypeMapperToResponse, TypeMapper } from './applyTypeMapperToResponse'
 import { chain } from './chain'
 import { LinkedType } from './linkTypeMap'
 import { Fields, Gql, requestToGql } from './requestToGql'
-import { getSubscriptionCreator, SubscriptionCreatorOptions } from './getSubscriptionCreator'
 
 export class ClientError extends Error {
   constructor(message?: string, public errors?: ReadonlyArray<GraphQLError>) {
@@ -24,20 +21,17 @@ export interface Fetcher {
   (gql: Gql, fetchImpl: typeof fetch, qsImpl: typeof qs): Promise<ExecutionResult<any>>
 }
 
-export interface Client<QR, QC, Q, MR, MC, M, SR, SC, S> {
+export interface Client<QR, QC, Q, MR, MC, M> {
   query(request: QR): Promise<ExecutionResult<Q>>
   mutation(request: MR): Promise<ExecutionResult<M>>
-  subscription(request: SR): Observable<ExecutionResult<S>>
   chain: {
     query: QC
     mutation: MC
-    subscription: SC
   }
 }
 
 export interface ClientOptions {
   fetcher?: Fetcher
-  subscriptionCreatorOptions?: SubscriptionCreatorOptions
 }
 
 export interface ClientEmbeddedOptions {
@@ -47,16 +41,12 @@ export interface ClientEmbeddedOptions {
   typeMapper?: TypeMapper
 }
 
-export const createClient = <QR extends Fields, QC, Q, MR extends Fields, MC, M, SR extends Fields, SC, S>({
+export const createClient = <QR extends Fields, QC, Q, MR extends Fields, MC, M>({
   fetcher,
-  subscriptionCreatorOptions,
   queryRoot,
   mutationRoot,
-  subscriptionRoot,
   typeMapper,
-}: ClientOptions & ClientEmbeddedOptions): Client<QR, QC, Q, MR, MC, M, SR, SC, S> => {
-  const createSubscription = subscriptionCreatorOptions ? getSubscriptionCreator(subscriptionCreatorOptions) : () => NEVER
-
+}: ClientOptions & ClientEmbeddedOptions): Client<QR, QC, Q, MR, MC, M> => {
   const query = (request: QR): Promise<ExecutionResult<Q>> => {
     if (!fetcher) throw new Error('fetcher argument is missing')
     if (!queryRoot) throw new Error('queryRoot argument is missing')
@@ -79,17 +69,6 @@ export const createClient = <QR extends Fields, QC, Q, MR extends Fields, MC, M,
       : resultPromise
   }
 
-  const subscription = (request: SR): Observable<ExecutionResult<S>> => {
-    if (!subscriptionCreatorOptions) throw new Error('subscriptionClientOptions argument is missing')
-    if (!subscriptionRoot) throw new Error('subscriptionRoot argument is missing')
-
-    const resultObservable = createSubscription(requestToGql('subscription', subscriptionRoot, request, typeMapper))
-
-    return typeMapper
-      ? resultObservable.pipe(map(result => applyTypeMapperToResponse(subscriptionRoot, result, typeMapper)))
-      : resultObservable
-  }
-
   const mapResponse = (path: string[], defaultValue: any) => (response: ExecutionResult) => {
     if (response.errors) throw new ClientError(`Response contains errors`, response.errors)
     if (!response.data) throw new ClientError('Response data is empty')
@@ -104,13 +83,9 @@ export const createClient = <QR extends Fields, QC, Q, MR extends Fields, MC, M,
   return {
     query,
     mutation,
-    subscription,
     chain: {
       query: <any>chain((path, request, defaultValue) => query(request).then(mapResponse(path, defaultValue))),
       mutation: <any>chain((path, request, defaultValue) => mutation(request).then(mapResponse(path, defaultValue))),
-      subscription: <any>(
-        chain((path, request, defaultValue) => subscription(request).pipe(map(mapResponse(path, defaultValue))))
-      ),
     },
   }
 }
